@@ -17,6 +17,9 @@ late-interaction diffusion Transformer.
 
 ---
 
+> ▶ 90 秒竖屏讲解（中文，抖音）：[`docs/media/xrec-promo-1080x1920.mp4`](docs/media/xrec-promo-1080x1920.mp4)
+> —— 与本文同一套结论，2026-11-22 发布。
+
 ## Why this exists
 
 X-Rec replaces the retrieval head with a generative one: instead of pooling a user into one vector, it
