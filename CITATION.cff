@@ -1,0 +1,31 @@
+cff-version: 1.2.0
+message: "Reference implementation of X-Rec (arXiv:2609.29180). Cite the paper."
+title: "xrec-ref: reference implementation of X-Rec"
+abstract: "Unofficial, mechanism-level reimplementation of X-Rec: continuous-space generative retrieval via Riemannian flow matching with anchor conditioning and a late-interaction diffusion Transformer. Synthetic fixture only; not a reproduction of the paper's numbers."
+version: 0.1.0
+date-released: "2026-11-22"
+license: MIT
+type: software
+keywords:
+  - generative retrieval
+  - recommender systems
+  - flow matching
+  - diffusion models
+  - Riemannian geometry
+preferred-citation:
+  type: article
+  title: "X-Rec Technical Report"
+  authors:
+    - family-names: Shen
+      given-names: Chenglei
+    - family-names: Huang
+      given-names: Chenzhe
+    - family-names: Jiang
+      given-names: Dong
+    - family-names: Gao
+      given-names: Hongjie
+    - family-names: Xu
+      given-names: Kun
+  journal: "arXiv preprint arXiv:2609.29180"
+  year: 2026
+  url: "https://arxiv.org/abs/2609.29180"

@@ -1,0 +1,35 @@
+xrec-ref — NOTICE
+=================
+
+This repository is an independent, unofficial reimplementation of the method described in:
+
+  X-Rec Technical Report
+  ByteDance / TikTok-Data-Content Intelligence & TikTok-Data-Feed Quality
+  arXiv:2609.29180v1, 24 Sep 2026
+  https://arxiv.org/abs/2609.29180
+
+Attribution and scope
+---------------------
+* The method, the algorithm and all reported production results belong to the paper's authors and
+  ByteDance. Nothing in this repository is endorsed by, reviewed by, or affiliated with ByteDance,
+  TikTok, or the paper's authors.
+* This repository contains an implementation written from the paper's equations. Where the paper is
+  silent or ambiguous, choices were made and are documented in xrec_ref/README.md.
+* No code from ByteDance or TikTok is included here.
+
+Third-party material
+--------------------
+* The paper PDF and its extracted text are NOT redistributed in this repository. Fetch them from arXiv
+  under the terms of the arXiv license (http://arxiv.org/licenses/nonexclusive-distrib/1.0/).
+* No third-party datasets are bundled. The synthetic fixture in xrec_ref/data.py is generated at
+  runtime.
+* Referenced open-source projects (RQ-VAE-Recommender, RecBole, MiniOneRec, SASRec, ComiRec, DreamRec,
+  LRURec, Latte, LLaDA-Rec, ContRec, MaskGR, DreamX-Rec, faiss) are listed by URL only and remain under
+  their own licenses.
+
+Numbers
+-------
+All numbers produced by this repository come from a synthetic fixture (6,000 items, 8 interest modes,
+~1M parameters) or from a synthetic log written in MovieLens format by dataset.py. No real interaction
+dataset is bundled, and no number here was measured on real user data. They are NOT comparable to the
+paper's results on TikTok's streaming benchmark and must not be presented as a reproduction of them.

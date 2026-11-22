@@ -1,0 +1,36 @@
+﻿# ---- Python ----
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+build/
+dist/
+.venv/
+venv/
+
+# ---- runtime artifacts ----
+data/
+runs/
+!runs/.gitkeep
+*.pt
+*.pth
+*.ckpt
+
+# ---- paper / source material (NOT redistributed; fetch from arXiv) ----
+paper/
+*.pdf
+
+# ---- editors / OS ----
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- local scratch ----
+*.log
+!cad_mcp.log.keep
+
+

@@ -1,0 +1,65 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: pip
+
+      - name: Install CPU torch + test deps
+        run: |
+          python -m pip install --upgrade pip
+          pip install --index-url https://download.pytorch.org/whl/cpu torch
+          pip install "numpy>=1.24" "scikit-learn>=1.3" "pytest>=7.4"
+
+      - name: RFM numerical identities
+        run: python xrec_ref/rfm.py --selftest
+
+      - name: Unit tests
+        run: pytest -q
+
+      - name: End-to-end smoke (synthetic fixture, 2 steps) + checkpoint
+        run: |
+          python xrec_ref/train.py --steps-pre 2 --steps-sft 2 --eval-n 32 \
+            --out runs/ci.json --ckpt-out runs/ci.pt
+
+      - name: End-to-end smoke (MovieLens-format log, 2 steps)
+        run: |
+          python xrec_ref/dataset.py --fixture runs/fixture.dat --users 200 --items 200 \
+            --min-len 55 --max-len 70
+          python xrec_ref/train.py --data runs/fixture.dat --steps-pre 2 --steps-sft 2 \
+            --eval-n 32 --out runs/ci_data.json
+
+      - name: SID-AR control smoke
+        run: python xrec_ref/train.py --arch sid_ar --steps-sft 2 --eval-n 32 --out runs/ci_sid.json
+
+      - name: Serving self-test (real socket, one request)
+        run: python xrec_ref/serve.py --ckpt runs/ci.pt --self-test
+
+      - name: ANN index self-benchmark
+        run: python xrec_ref/index.py
+
+  lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check xrec_ref tests conftest.py scripts
