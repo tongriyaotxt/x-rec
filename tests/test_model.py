@@ -82,3 +82,23 @@ def test_u2i_controls_shapes_and_loss():
         trig = model.sample(split["ctx"][:4], split["act"][:4], split["dur"][:4], K=4)
         assert trig.shape == (4, 4, cfg.d_e)
         assert (trig.norm(dim=-1) - 1).abs().max().item() < 1e-5
+
+
+def test_sample_weights_change_the_loss_only_when_not_uniform():
+    """Popularity re-weighting must be a no-op at w=1 and must actually re-weight otherwise."""
+    cfg, world, split = _fixture()
+    model = XRec(cfg, world["emb"], world["anchor_of_item"]).eval()
+    batch = _batch(cfg, split)
+    ones = torch.ones(cfg.batch)
+
+    torch.manual_seed(5)
+    a_ref, r_ref = model.loss(batch)
+    torch.manual_seed(5)
+    a_one, r_one = model.loss(batch, w=ones)
+    assert torch.allclose(a_ref, a_one, atol=1e-6) and torch.allclose(r_ref, r_one, atol=1e-6)
+
+    skewed = torch.linspace(0.1, 5.0, cfg.batch)
+    torch.manual_seed(5)
+    _, r_skew = model.loss(batch, w=skewed)
+    assert not torch.allclose(r_ref, r_skew, atol=1e-6)
+    assert torch.isfinite(r_skew)

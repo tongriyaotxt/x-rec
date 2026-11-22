@@ -2,7 +2,16 @@
 import torch
 
 from config import CFG
-from data import batches, build_world, make_split, mode_recall, pairwise_cosine, recall_at
+from data import (
+    batches,
+    build_world,
+    dual_mode_hit,
+    make_split,
+    mode_recall,
+    pairwise_cosine,
+    popularity_weights,
+    recall_at,
+)
 from rfm import normalize
 
 
@@ -71,3 +80,28 @@ def test_batch_iterator_is_bounded_and_complete():
     seen = list(batches(s, cfg.batch, steps=5, seed=0))
     assert len(seen) == 5
     assert all(b[0].shape == (cfg.batch, cfg.seq_len) for b in seen)
+
+
+def test_dual_mode_hit_counts_both_interests():
+    """K copies of one trigger can only reach one mode; two triggers aimed at the two modes reach both."""
+    g = torch.Generator().manual_seed(0)
+    emb = normalize(torch.randn(60, 16, generator=g))
+    item_mode = torch.arange(60) // 30                     # 0..29 -> mode 0, 30..59 -> mode 1
+    active = torch.tensor([[0, 1], [0, 1]])
+
+    single = emb[0][None, None].repeat(2, 6, 1)            # both users, 6 identical triggers
+    assert dual_mode_hit(single, active, item_mode, emb, R=1) == 0.0
+
+    row = torch.stack([emb[0], emb[0], emb[30]])           # two triggers in mode 0, one in mode 1
+    two = row[None].repeat(2, 1, 1)                        # (2 users, 3 triggers, d)
+    assert dual_mode_hit(two, active, item_mode, emb, R=1) == 1.0
+
+
+def test_popularity_weights_are_monotone_and_normalised():
+    g = torch.Generator().manual_seed(0)
+    n_items = 50
+    ctx = torch.randint(0, 5, (200, 8), generator=g)       # items 0..4 hot, 5..49 never seen
+    w = popularity_weights(ctx, n_items, alpha=1.0)
+    assert abs(float(w.mean()) - 1.0) < 1e-5               # normalised: mean weight is 1
+    assert float(w[:5].min()) > float(w[5:].max())         # head outranks tail
+    assert torch.allclose(popularity_weights(ctx, n_items, alpha=0.0), torch.ones(n_items))

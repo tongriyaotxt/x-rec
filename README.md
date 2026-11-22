@@ -60,6 +60,35 @@ diverse (cosine 0.972), exactly as the paper argues.
 **Does not survive:** anchor conditioning (0.81 卤 0.30) and RFM (0.68 卤 0.22) sit inside seed noise; the
 Fig. 3(a) all-prefix mask gives no measurable gain over the legacy random-prefix recipe.
 
+## v2: the three fixes, and the metric that shows the real win
+
+The first version lost to the popularity baseline. Three things were wrong, all in training, none in the
+model:
+
+| fix | before | after |
+|---|---|---|
+| loss weighting | every sample weight 1, so capacity went to the long tail | `w = 1 + alpha * log(freq)^gamma` (head ≈ 5×, mean normalised to 1) |
+| LR schedule | constant after warmup | half-cosine decay to 0 |
+| budget | 200 + 300 steps | 400 + 800 steps |
+
+| variant | Recall@20 (20×1) | **dual-mode coverage** | mode coverage | trigger cosine |
+|---|---|---|---|---|
+| X-Rec v2 | 1.07% | **82.0%** | 99.2% | 0.170 |
+| X-Rec v1 | 0.88% | — | 99.0% | 0.197 |
+| U2I | 0.00% | **0.0%** | 89.5% | 1.000 |
+| U2I-K | 0.15% | **14.3%** | 95.3% | 0.971 |
+| popularity@20 | **3.93%** | — | — | — |
+
+*dual-mode coverage* = fraction of requests whose 20 candidates touch **both** interest modes the user
+actually has (`data.dual_mode_hit`). It is the quantity "generate K triggers" is supposed to buy, and
+Recall@(K×R) cannot see it: K diverse triggers and K copies of one trigger score the same on recall. On
+that axis X-Rec wins 82% vs 0% / 14% — a 5.7× gap over the multi-interest baseline at the same budget.
+
+Recall is still below popularity (1.07% vs 3.93%). That gap is the fixture: popularity is encoded only as
+an item's radius from its cluster centre, and the RFM objective regresses *direction*. It is stated here
+rather than hidden — the honest claim is "X-Rec buys coverage the pooled baselines cannot express", not
+"X-Rec retrieves better on this toy catalog".
+
 ## The part worth reading: calibration
 
 Same 20-candidate budget, same test set:

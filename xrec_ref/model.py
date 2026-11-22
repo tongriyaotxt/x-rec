@@ -146,6 +146,14 @@ def timestep_embedding(t: torch.Tensor, dim: int = 64) -> torch.Tensor:
     return torch.cat([args.cos(), args.sin()], dim=-1)
 
 
+def _wmean(x: torch.Tensor, w: torch.Tensor | None = None) -> torch.Tensor:
+    """Weighted mean; `w=None` is the plain mean, so the uniform loss is unchanged."""
+    if w is None:
+        return x.mean()
+    w = w.to(x.dtype)
+    return (x * w).sum() / w.sum().clamp_min(1e-8)
+
+
 # ------------------------------------------------------------------ X-Rec
 class XRec(nn.Module):
     def __init__(self, cfg, item_emb: torch.Tensor, anchor_of_item: torch.Tensor):
@@ -207,7 +215,7 @@ class XRec(nn.Module):
         return tangent_project(self.v_head(out), x_t)
 
     # ---------------------------------------------------------------- losses
-    def loss(self, batch, gen=None):
+    def loss(self, batch, gen=None, w=None):
         cfg = self.cfg
         items, act, dur, tgt, *_ = batch
         M = items.shape[0]
@@ -215,7 +223,8 @@ class XRec(nn.Module):
 
         anc_tgt = self.anchor_of_item[tgt]
         logits = self.anchor_logits(h_last, f)
-        l_anchor = F.cross_entropy(logits, anc_tgt) if cfg.use_anchor else logits.new_zeros(())
+        l_anchor = (_wmean(F.cross_entropy(logits, anc_tgt, reduction="none"), w)
+                    if cfg.use_anchor else logits.new_zeros(()))
 
         R = cfg.n_noise_sft
         tgt_emb = self.item_emb[tgt]
@@ -245,9 +254,11 @@ class XRec(nn.Module):
         v_tgt = v_tgt.reshape(R * M, cfg.d_e)
         if cfg.use_rfm:
             v_tgt = tangent_project(v_tgt, x_flat)
-        return cfg.alpha * l_anchor, F.mse_loss(v_pred, v_tgt)
+        mse = (v_pred - v_tgt).pow(2).mean(-1)                    # (R*M,)
+        l_rfm = _wmean(mse, w.index_select(0, idx) if w is not None else None)
+        return cfg.alpha * l_anchor, l_rfm
 
-    def loss_all_prefix(self, batch, gen=None):
+    def loss_all_prefix(self, batch, gen=None, w=None):
         """Paper Fig.3(a): ONE encoder pass over the whole context, every position predicts its successor.
 
         The old path reran the encoder for a randomly cut prefix each step; this instead reuses a single
@@ -269,7 +280,8 @@ class XRec(nn.Module):
             tgt = items[:, i + 1]
             anc_tgt = self.anchor_of_item[tgt]
             if cfg.use_anchor:
-                l_anchor = l_anchor + F.cross_entropy(self.anchor_logits(h[:, i], f_all[:, i]), anc_tgt)
+                ce = F.cross_entropy(self.anchor_logits(h[:, i], f_all[:, i]), anc_tgt, reduction="none")
+                l_anchor = l_anchor + _wmean(ce, w)
 
             tgt_emb = self.item_emb[tgt]
             eps = normalize(torch.randn(R, M, cfg.d_e, device=dev, generator=gen))
@@ -298,7 +310,8 @@ class XRec(nn.Module):
             v_t = v_tgt.reshape(R * M, cfg.d_e)
             if cfg.use_rfm:
                 v_t = tangent_project(v_t, x_flat)
-            l_rfm = l_rfm + F.mse_loss(v_pred, v_t)
+            mse = (v_pred - v_t).pow(2).mean(-1)
+            l_rfm = l_rfm + _wmean(mse, w.index_select(0, idx) if w is not None else None)
         l_anchor = l_anchor / n_pos if cfg.use_anchor else l_anchor
         return cfg.alpha * l_anchor, l_rfm / n_pos
 

@@ -146,3 +146,40 @@ def pairwise_cosine(triggers: torch.Tensor) -> float:
     x = normalize(triggers)
     sim = torch.einsum("bkd,bjd->bkj", x, x)
     return float(((sim.sum((-1, -2)) - k) / (k * (k - 1))).mean())
+
+
+@torch.no_grad()
+def dual_mode_hit(triggers: torch.Tensor, active: torch.Tensor, item_mode: torch.Tensor,
+                  item_emb: torch.Tensor, R: int = 1, chunk: int = 64) -> float:
+    """Does the candidate set touch *both* of the user's active interest modes?
+
+    Recall@(K x R) only counts the hit item, so K diverse triggers and K copies of one trigger score the
+    same. This is the metric that pays for diversity: with 20 candidates, a user with two interests should
+    get both. It is the quantity the paper's "multi-trigger generation" claim is actually about.
+    """
+    hits = 0
+    for i in range(0, triggers.shape[0], chunk):
+        sim = torch.einsum("bkd,vd->bkv", triggers[i:i + chunk], item_emb)
+        cand = sim.topk(R, dim=-1).indices.reshape(triggers[i:i + chunk].shape[0], -1)
+        m = item_mode[cand]                                   # (b, K*R)
+        act = active[i:i + chunk]                             # (b, 2)
+        cov0 = (m == act[:, 0:1]).any(-1)
+        cov1 = (m == act[:, 1:2]).any(-1)
+        hits += int((cov0 & cov1).sum())
+    return hits / triggers.shape[0]
+
+
+@torch.no_grad()
+def popularity_weights(train_ctx: torch.Tensor, n_items: int, alpha: float = 1.0,
+                       gamma: float = 1.0) -> torch.Tensor:
+    """Per-item training weight that puts probability mass back on the head.
+
+    The fixture samples targets from a Zipf popularity; an unweighted loss treats a head item and a tail
+    item as equally important, so a 1M-parameter model spends its capacity on tail items it will never be
+    asked for. `alpha=0` reproduces the old uniform loss.
+    """
+    freq = torch.bincount(train_ctx.flatten(), minlength=n_items).float()
+    logp = torch.log1p(freq)
+    w = 1.0 + alpha * (logp / logp.max().clamp_min(1e-6)) ** gamma
+    return w / w.mean()
+

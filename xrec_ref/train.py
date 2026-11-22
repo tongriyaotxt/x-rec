@@ -11,13 +11,23 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import os
 import time
 
 import torch
 
 from config import CFG
-from data import batches, build_world, make_split, mode_recall, pairwise_cosine, recall_at
+from data import (
+    batches,
+    build_world,
+    dual_mode_hit,
+    make_split,
+    mode_recall,
+    pairwise_cosine,
+    popularity_weights,
+    recall_at,
+)
 from model import U2I, XRec
 from models_sid import SIDAR
 from sid import ResidualQuantizer
@@ -44,17 +54,27 @@ def build_model(cfg, world):
     raise ValueError(cfg.arch)
 
 
-def run_stage(model, split, cfg, steps, lr, tag, device, log_every=50, loss_fn=None):
+def run_stage(model, split, cfg, steps, lr, tag, device, log_every=50, loss_fn=None, weights=None):
     loss_fn = loss_fn or model.loss
     params = [p for p in model.parameters() if p.requires_grad]
     opt = torch.optim.AdamW(params, lr=lr, weight_decay=cfg.wd)
     warm = max(1, min(200, steps // 10))
-    sched = torch.optim.lr_scheduler.LambdaLR(opt, lambda s: min(1.0, (s + 1) / warm))
+
+    def sched_fn(s):
+        if s < warm:
+            return (s + 1) / warm
+        if not cfg.cosine:
+            return 1.0
+        p = (s - warm) / max(1, steps - warm)
+        return 0.5 * (1.0 + math.cos(math.pi * p))
+
+    sched = torch.optim.lr_scheduler.LambdaLR(opt, sched_fn)
     model.train()
     t0, hist = time.time(), []
     for i, batch in enumerate(batches(split, cfg.batch, steps, seed=0)):
         batch = tuple(t.to(device) for t in batch)
-        l_anchor, l_rfm = loss_fn(batch)
+        w = weights.index_select(0, batch[3]) if weights is not None else None
+        l_anchor, l_rfm = (loss_fn(batch, w=w) if w is not None else loss_fn(batch))
         loss = l_rfm + l_anchor
         opt.zero_grad(set_to_none=True)
         loss.backward()
@@ -97,6 +117,8 @@ def evaluate(model, split, cfg, world, device, n=None, K=None, R=None, denoise=N
         recall_1x20=recall_at(trig[:, :1], tgt, table, R=20),
         mode_recall_KxR=mode_recall(trig, split["active_modes"].to(device)[idx],
                                     world["mode"].to(device), table, R=r),
+        dual_mode_hit=dual_mode_hit(trig, split["active_modes"].to(device)[idx],
+                                    world["mode"].to(device), table, R=r),
         pairwise_cos=pairwise_cosine(trig),
         norm_dev=float((trig.norm(dim=-1) - 1).abs().max()),
         gen_ms_per_request=gen_ms / max(1, n),
@@ -123,6 +145,11 @@ def main():
     ap.add_argument("--anchor-temp", type=float, default=None)
     ap.add_argument("--eval-n", type=int, default=None)
     ap.add_argument("--zipf", type=float, default=0.5)
+    ap.add_argument("--pop-alpha", type=float, default=1.0,
+                    help="popularity re-weighting strength (0 = uniform loss)")
+    ap.add_argument("--pop-gamma", type=float, default=1.0, help="shape of the log-frequency curve")
+    ap.add_argument("--uniform-loss", action="store_true", help="disable popularity re-weighting")
+    ap.add_argument("--no-cosine", action="store_true", help="constant LR after warmup (old behaviour)")
     ap.add_argument("--sweep", action="store_true")
     ap.add_argument("--seed", type=int, default=0)
     ap.add_argument("--eval-seed", type=int, default=0)
@@ -144,6 +171,9 @@ def main():
     cfg.use_rfm = not args.no_rfm
     cfg.use_pretrain = not args.no_pretrain
     cfg.sid_codebooks, cfg.sid_size = args.sid_codebooks, args.sid_size
+    cfg.pop_alpha = 0.0 if args.uniform_loss else args.pop_alpha
+    cfg.pop_gamma = args.pop_gamma
+    cfg.cosine = not args.no_cosine
     for name, val in [("steps_pre", args.steps_pre), ("steps_sft", args.steps_sft), ("K", args.K),
                       ("R", args.R), ("steps", args.denoise), ("anchor_temp", args.anchor_temp),
                       ("n_eval", args.eval_n), ("pretrain_mask", args.pretrain_mask)]:
@@ -177,6 +207,15 @@ def main():
     print(f"arch={cfg.arch} params={n_par/1e6:.2f}M anchor={cfg.use_anchor} rfm={cfg.use_rfm} "
           f"pretrain={cfg.use_pretrain}/{cfg.pretrain_mask} extras={extras}", flush=True)
 
+    # popularity re-weighting: the fixture's targets follow a Zipf head, so an unweighted loss spends
+    # capacity on tail items nobody will ever be retrieved for. weight = 1 + alpha * log-freq^gamma.
+    weights = None
+    if cfg.pop_alpha > 0 and cfg.arch != "sid_ar":
+        weights = popularity_weights(train["ctx"], cfg.n_items, cfg.pop_alpha, cfg.pop_gamma).to(device)
+        print(f"popularity re-weighting alpha={cfg.pop_alpha} gamma={cfg.pop_gamma} "
+              f"w=[{float(weights.min()):.2f}, {float(weights.max()):.2f}] mean={float(weights.mean()):.2f}",
+              flush=True)
+
     res = dict(config=cfg.to_dict(), arch=cfg.arch, params=n_par, device=str(device),
                anchor_acc=acc, intra_mode_cos=world["intra_mode_cos"], dataset=ds_info,
                extras=extras, hist={})
@@ -190,8 +229,9 @@ def main():
         if cfg.arch == "xrec" and cfg.use_pretrain:
             loss_fn = model.loss_all_prefix if cfg.pretrain_mask == "all" else model.loss
             res["hist"]["pretrain"] = run_stage(model, pre, cfg, cfg.steps_pre, cfg.lr_pre, "pre",
-                                                device, loss_fn=loss_fn)
-        res["hist"]["sft"] = run_stage(model, train, cfg, cfg.steps_sft, cfg.lr_sft, "sft", device)
+                                                device, loss_fn=loss_fn, weights=weights)
+        res["hist"]["sft"] = run_stage(model, train, cfg, cfg.steps_sft, cfg.lr_sft, "sft", device,
+                                       weights=weights)
         if args.ckpt_out:
             os.makedirs(os.path.dirname(args.ckpt_out) or ".", exist_ok=True)
             torch.save(dict(cfg=cfg.to_dict(), arch=cfg.arch, state_dict=model.state_dict(),

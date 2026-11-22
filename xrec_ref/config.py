@@ -30,8 +30,11 @@ class CFG:
     batch: int = 64
     lr_pre: float = 5e-4
     lr_sft: float = 1e-4
-    steps_pre: int = 200
-    steps_sft: int = 300
+    steps_pre: int = 400
+    steps_sft: int = 800
+    cosine: bool = True            # cosine decay after warmup (was: constant after warmup)
+    pop_alpha: float = 1.0         # popularity re-weighting strength; 0 = the old uniform loss
+    pop_gamma: float = 1.0         # shape of the log-frequency curve
     alpha: float = 0.1             # anchor loss weight
     beta: float = 1.0              # RFM loss weight
     wd: float = 0.01
