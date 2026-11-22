@@ -1,6 +1,6 @@
 cff-version: 1.2.0
 message: "Reference implementation of X-Rec (arXiv:2609.29180). Cite the paper."
-title: "xrec-ref: reference implementation of X-Rec"
+title: "x-rec: reference implementation of X-Rec"
 abstract: "Unofficial, mechanism-level reimplementation of X-Rec: continuous-space generative retrieval via Riemannian flow matching with anchor conditioning and a late-interaction diffusion Transformer. Synthetic fixture only; not a reproduction of the paper's numbers."
 version: 0.1.0
 date-released: "2026-11-22"
