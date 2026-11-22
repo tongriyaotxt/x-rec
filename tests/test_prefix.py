@@ -1,10 +1,10 @@
 """All-prefix pretraining (paper Fig.3a): N-1 targets from one encoder pass, identical to the
 last-position path when the sequence has length 2."""
 import torch
-from config import CFG
-from model import XRec
 
+from config import CFG
 from data import build_world, make_split
+from model import XRec
 
 
 def _cfg() -> CFG:

@@ -21,6 +21,7 @@ import os
 from dataclasses import dataclass
 
 import torch
+
 from index import kmeans
 from rfm import normalize
 

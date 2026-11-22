@@ -1,5 +1,6 @@
 """IVF index: exactness at full probe, recall monotonicity, persistence, k-means sanity."""
 import torch
+
 from index import IVFIndex, brute_force_topk, kmeans, recall_at_k, sweep
 
 

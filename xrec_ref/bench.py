@@ -20,11 +20,11 @@ import sys
 import time
 
 import torch
+
 from config import CFG
+from data import build_world, make_split
 from model import XRec
 from rfm import normalize
-
-from data import build_world, make_split
 
 
 def timeit(fn, rep: int = 3, warmup: int = 1) -> float:

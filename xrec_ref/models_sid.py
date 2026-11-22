@@ -10,6 +10,7 @@ from __future__ import annotations
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
+
 from model import Attention, EncLayer, RMSNorm, RoPE, SwiGLU
 from rfm import normalize
 from sid import ResidualQuantizer

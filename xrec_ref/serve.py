@@ -30,6 +30,7 @@ from collections import deque
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 import torch
+
 from config import CFG
 from index import IVFIndex
 from model import U2I, XRec

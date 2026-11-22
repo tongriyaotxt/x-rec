@@ -15,3 +15,13 @@ target-version = "py310"
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
 ignore = ["E501"]
+
+# The repo is a flat module directory (`xrec_ref/` has no `__init__.py`) imported by tests and scripts
+# via conftest/sys.path, so ruff cannot infer first-party vs third-party reliably — and the inference
+# differed between Windows and the Linux runner, which is why the lint job failed while local lint passed.
+# Declaring the set makes `ruff check` deterministic on every platform.
+[tool.ruff.lint.isort]
+known-first-party = [
+    "baselines", "config", "data", "dataset", "index", "model", "models_sid",
+    "rfm", "serve", "sid", "train",
+]

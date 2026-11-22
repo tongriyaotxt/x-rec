@@ -1,5 +1,6 @@
 """Numerical identities of the Riemannian flow-matching core (paper eq.20-24, eq.31)."""
 import torch
+
 from rfm import (
     cfg_combine,
     conditional_velocity,

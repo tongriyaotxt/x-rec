@@ -1,9 +1,9 @@
 """Model-level checks: shapes, on-manifold triggers, deterministic sampling, U2I control."""
 import torch
-from config import CFG
-from model import U2I, XRec
 
+from config import CFG
 from data import build_world, make_split
+from model import U2I, XRec
 
 
 def tiny_cfg() -> CFG:

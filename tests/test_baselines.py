@@ -1,7 +1,6 @@
 """Calibration baselines: popularity must be beaten before any ranking claim is meaningful."""
 from baselines import item_frequency, popularity_recall, random_recall
 from config import CFG
-
 from data import build_world, make_split
 
 

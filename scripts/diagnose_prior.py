@@ -21,9 +21,8 @@ sys.path.insert(0, os.path.join(ROOT, "xrec_ref"))
 
 from baselines import item_frequency, popularity_recall, retrieval_profile  # noqa: E402
 from config import CFG  # noqa: E402
-from train import build_model, evaluate, run_stage  # noqa: E402
-
 from data import build_world, make_split  # noqa: E402
+from train import build_model, evaluate, run_stage  # noqa: E402
 
 
 def main():

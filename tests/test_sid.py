@@ -1,11 +1,11 @@
 """SID-AR control: residual quantiser fidelity, AR loss/sampling, agreement with the paper's 0.94 claim."""
 import torch
+
 from config import CFG
+from data import build_world, make_split
 from models_sid import SIDAR
 from rfm import normalize
 from sid import ResidualQuantizer
-
-from data import build_world, make_split
 
 
 def _cfg() -> CFG:

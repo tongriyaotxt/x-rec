@@ -1,9 +1,9 @@
 """Fixture correctness: the synthetic stream and the Recall@(K x R) implementation."""
 import torch
-from config import CFG
-from rfm import normalize
 
+from config import CFG
 from data import batches, build_world, make_split, mode_recall, pairwise_cosine, recall_at
+from rfm import normalize
 
 
 def _cfg():

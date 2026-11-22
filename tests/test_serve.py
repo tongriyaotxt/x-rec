@@ -5,11 +5,11 @@ import urllib.error
 import urllib.request
 
 import torch
+
 from config import CFG
+from data import build_world, make_split
 from model import XRec
 from serve import make_server
-
-from data import build_world, make_split
 
 
 def _ckpt(tmp_path) -> tuple[str, CFG, dict]:

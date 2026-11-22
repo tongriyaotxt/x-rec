@@ -15,12 +15,12 @@ import os
 import time
 
 import torch
+
 from config import CFG
+from data import batches, build_world, make_split, mode_recall, pairwise_cosine, recall_at
 from model import U2I, XRec
 from models_sid import SIDAR
 from sid import ResidualQuantizer
-
-from data import batches, build_world, make_split, mode_recall, pairwise_cosine, recall_at
 
 
 def build_model(cfg, world):
